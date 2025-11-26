@@ -1664,10 +1664,9 @@ class LocalPythonExecutor(PythonExecutor):
             InterpreterError: If any of the authorized modules are not installed.
         """
         # Map import names to package names for special cases
+        # mpl_toolkits is a namespace package from matplotlib, so check for matplotlib
         import_name_mapping = {
             "mpl_toolkits": "matplotlib",
-            "sklearn": "sklearn",  # scikit-learn installs as sklearn
-            "Bio": "Bio",  # biopython installs as Bio
         }
         
         missing_modules = []
