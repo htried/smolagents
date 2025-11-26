@@ -308,6 +308,7 @@ class MultiStepAgent(ABC):
         final_answer_checks: list[Callable] | None = None,
         return_full_result: bool = False,
         logger: AgentLogger | None = None,
+        budget_exceeded_callback: Callable | None = None,
     ):
         self.agent_name = self.__class__.__name__
         self.model = model
@@ -349,6 +350,7 @@ class MultiStepAgent(ABC):
         self.monitor = Monitor(self.model, self.logger)
         self._setup_step_callbacks(step_callbacks)
         self.stream_outputs = False
+        self.budget_exceeded_callback = budget_exceeded_callback
 
     @property
     def system_prompt(self) -> str:
@@ -544,6 +546,11 @@ You have been provided with these additional arguments, that you can access dire
         while not returned_final_answer and self.step_number <= max_steps:
             if self.interrupt_switch:
                 raise AgentError("Agent interrupted.", self.logger)
+            
+            # Check budget if callback is provided
+            if self.budget_exceeded_callback is not None:
+                if self.budget_exceeded_callback(self):
+                    raise AgentError("Budget exceeded.", self.logger)
 
             # Run a planning step if scheduled
             if self.planning_interval is not None and (
