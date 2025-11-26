@@ -1655,15 +1655,30 @@ class LocalPythonExecutor(PythonExecutor):
         Check that all authorized imports are installed on the system.
 
         Handles wildcard imports ("*") and partial star-pattern imports (e.g., "os.*").
+        Also handles special import name mappings:
+        - mpl_toolkits -> matplotlib (namespace package)
+        - sklearn -> scikit-learn (package name differs from import name)
+        - Bio -> biopython (package name differs from import name)
 
         Raises:
             InterpreterError: If any of the authorized modules are not installed.
         """
-        missing_modules = [
-            base_module
-            for imp in self.authorized_imports
-            if imp != "*" and find_spec(base_module := imp.split(".")[0]) is None
-        ]
+        # Map import names to package names for special cases
+        import_name_mapping = {
+            "mpl_toolkits": "matplotlib",
+            "sklearn": "sklearn",  # scikit-learn installs as sklearn
+            "Bio": "Bio",  # biopython installs as Bio
+        }
+        
+        missing_modules = []
+        for imp in self.authorized_imports:
+            if imp == "*":
+                continue
+            base_module = imp.split(".")[0]
+            # Check if this is a special case that needs mapping
+            check_module = import_name_mapping.get(base_module, base_module)
+            if find_spec(check_module) is None:
+                missing_modules.append(base_module)
         if missing_modules:
             raise InterpreterError(
                 f"Non-installed authorized modules: {', '.join(missing_modules)}. "
