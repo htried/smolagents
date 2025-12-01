@@ -17,11 +17,8 @@
 from dataclasses import dataclass
 from typing import Any
 
-from .local_python_executor import (
-    BASE_BUILTIN_MODULES,
-    BASE_PYTHON_TOOLS,
-    evaluate_python_code,
-)
+from .local_python_executor import (BASE_BUILTIN_MODULES, BASE_PYTHON_TOOLS,
+                                    evaluate_python_code)
 from .tools import PipelineTool, Tool
 
 
@@ -336,6 +333,57 @@ class ApiWebSearchTool(Tool):
         )
 
 
+class GoogleCustomSearchTool(ApiWebSearchTool):
+    """Custom ApiWebSearchTool subclass for Google Custom Search API.
+    
+    Overrides extract_results to handle Google's response format (items) instead of Brave's (web.results).
+    Google Custom Search API returns results in the "items" key, with fields:
+    - "title": The title of the result
+    - "link": The URL of the result
+    - "snippet": The description/snippet of the result
+    
+    Args:
+        endpoint (`str`): API endpoint URL. Defaults to Google Custom Search API.
+        api_key (`str`): API key for authentication.
+        api_key_name (`str`): Environment variable name containing the API key. Defaults to "GOOGLE_SEARCH_API_KEY".
+        headers (`dict`, *optional*): Headers for API requests.
+        params (`dict`, *optional*): Parameters for API requests. Should include "cx" (Custom Search Engine ID) and "key" (API key).
+        rate_limit (`float`, default `1.0`): Maximum queries per second. Set to `None` to disable rate limiting.
+    
+    Examples:
+        ```python
+        >>> from smolagents import GoogleCustomSearchTool
+        >>> import os
+        >>> tool = GoogleCustomSearchTool(
+        ...     endpoint="https://www.googleapis.com/customsearch/v1",
+        ...     api_key_name="GOOGLE_SEARCH_API_KEY",
+        ...     params={
+        ...         "cx": os.environ.get("GOOGLE_SEARCH_CX", ""),
+        ...         "key": os.environ.get("GOOGLE_SEARCH_API_KEY", ""),
+        ...     },
+        ...     rate_limit=1.0,
+        ... )
+        >>> results = tool("Python programming")
+        >>> print(results)
+        ```
+    """
+    
+    def extract_results(self, data: dict) -> list:
+        """Extract results from Google Custom Search API response.
+        
+        Google Custom Search API returns results in the "items" key, not "web.results" like Brave API.
+        """
+        results = []
+        # Google Custom Search API returns results in "items" key
+        for item in data.get("items", []):
+            results.append({
+                "title": item.get("title", ""),
+                "url": item.get("link", ""),
+                "description": item.get("snippet", "")
+            })
+        return results
+
+
 class WebSearchTool(Tool):
     name = "web_search"
     description = "Performs a web search for a query and returns a string of the top search results formatted as markdown with titles, links, and descriptions."
@@ -616,7 +664,8 @@ class SpeechToTextTool(PipelineTool):
     output_type = "string"
 
     def __new__(cls, *args, **kwargs):
-        from transformers.models.whisper import WhisperForConditionalGeneration, WhisperProcessor
+        from transformers.models.whisper import (
+            WhisperForConditionalGeneration, WhisperProcessor)
 
         cls.pre_processor_class = WhisperProcessor
         cls.model_class = WhisperForConditionalGeneration
@@ -646,6 +695,7 @@ TOOL_MAPPING = {
 
 __all__ = [
     "ApiWebSearchTool",
+    "GoogleCustomSearchTool",
     "PythonInterpreterTool",
     "FinalAnswerTool",
     "UserInputTool",
